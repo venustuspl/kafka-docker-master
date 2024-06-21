@@ -1,0 +1,5 @@
+kafkahq:
+  connections:
+    ssl-dev:
+      properties:
+        bootstrap.servers: "172.17.0.1:9092"
