@@ -1,0 +1,90 @@
+Czym jest Kafka
+Czym jest Kafka? Jest to platforma do przetwarzania strumieni danych (event streaming platform). Pierwszy rzut na architekturę wskazuje, że jest to nic innego jak broker wiadomości, taki jak RabbitMQ, czy Amazon SQS. Mamy producentów i konsumentów, pomiędzy którymi możemy wymieniać  asynchronicznie wiadomości.
+
+Różnica tkwi w szczegółach. Kafka mocno stawia na wydajność i skalowalność. Pozwala na konfigurację wielu parametrów, dzięki czemu możemy dostosować sposób działania do specyfiki danych, którymi akurat operujemy, ich wielkości, częstotliwości potrzeby ich odczytu.
+
+Do tego mamy możliwość konfiguracji tego, jak długo wysyłane wiadomości będą przechowywane. W odróżnieniu od typowego brokera wiadomości dane nie będą usunięte tuż po odebraniu wiadomości przez adresata. W Apache Kafka adresat nie jest znany przy wysyłaniu wiadomości. Model publish/subscribe nie opisuje dobrze tego, jak można wykorzystać Apache Kafka. Bardziej przypomina to bazę danych NoSQL.
+
+Potrzebujemy uruchomić co najmniej dwa serwery (w znaczeniu procesy), aby mieć działającą instancję Kafki.
+
+
+Zookeeper
+
+Serwer gdzie Kafka trzyma swoją aktualną konfigurację. Listę brokerów, listę topiców, ich rozlokowane między brokerami, informację o uprawnieniach (ACLs). Odpowiada za sprawdzanie dostępności brokerów. W razie wykrycia problemu wysyła komunikat do brokerów.
+
+Gdy np. przestaje działać broker będący masterem dla partycji (leader) jedna z replik slave (replica) przejmuje jego role (więcej o algorytmie wybierania lidera).  Zookeper musi być uruchomiony, zanim uruchomimy Kafkę. Konsumenci i producenci nie mają z nim żadnej interakcji. Trzeba tylko pamiętać o tym, żeby był uruchomiony w klastrze.
+
+Zookeeper jest konieczny do prawidłowego działania klastra Kafki, więc warto w środowisku produkcyjnym mieć instancje zapasowe. Z uwagi na działanie replikacji w Zookeeper, rekomendowana jest nieparzysta liczba węzłów. Czyli minimalna sensowna wartość to trzy. Przy dużej liczbie brokerów można zwiększyć ich ilość do 5 lub 7.
+
+
+Brokerzy
+
+Serwery gdzie wysyła i odbiera się wiadomości. Przy tworzeniu klienta musimy podać w konfiguracji nazwy hostów i ich portów będących brokerami. Nie musimy podawać pełnej listy. Klient Kafki odpyta o nią brokera. Pisząc kod kliencki Kafki, nie odnosimy się do konkretnego brokera, tylko do topiku.
+
+Jeżeli chcemy mieć działającą replikację danych, potrzebujemy kilku brokerów. Sensownie jest zacząć od trzech. Ich liczbę możemy potem w razie potrzeby zwiększyć nawet do kilkuset.
+
+Wysyłanie wiadomości
+
+Wiadomość, czyli odpowiednik rekordu z bazy danych składa się z klucza (opcjonalnego w przypadku nieużywania kompaktowania danych), nagłówków (opcjonalnych, do dowolnego wykorzystania), metadanych, oraz wartości z naszymi danymi.
+
+Metadane zawierają docelowy topic. Jeżeli nie stworzymy klucza, to partycja będzie przydzielona losowo. Jeżeli klucz zostanie stworzony, to partycja będzie obliczona, domyślnie algorytmem round robin lub w jakikolwiek inny sposób, który sami wymyślimy i zaimplementujemy.
+
+Wiadomość ma też timestamp będący czasem wysłania, jeżeli będzie pusty, to zostanie ustawiony przez brokera. W Java wiadomość, jaką wysyłam, reprezentuje klasa ProducerRecord. Wiadomość może mieć wielkość do około 1 MB. Domyślnie wszystkie ustawienia związane z wysyłaniem są zoptymalizowane pod wiadomości do 1K. W jednym topicu możemy teoretycznie przechowywać wiadomości o zupełnie różnym formacie.
+
+W praktyce łatwiej umówić się na jeden schemat. Kafka nie zajmuje się walidacją danych. Danymi może być cokolwiek. Możemy to robić w momencie odbierania lub wysyłania danych w kodzie producenta, lub konsumenta.
+
+Topic
+
+Kluczowy element w Kafce. Zrozumienie jego budowy jest konieczne, aby zrozumieć wszystkie inne koncepty. Jest to odpowiednik kolejki komunikatów z klasycznych brokerów wiadomości. Nadawcy wiadomości wysyłają tam dane, a konsumenci je stamtąd czytają. W Kafce jednak nie działa on jak kolejka, a raczej jak tablica dwuwymiarowa składająca się z partycji i offsetu (indeksu).
+
+Liczba partycji jest ustalana przez nas. Do większości zastosowań wystarczy 10 partycji na początek. Partycje możemy dokładać bez żadnych dodatkowych kosztów.  Nie ma limitu partycji, jednak Kafka zacznie w pewnym momencie spowalniać, rzeczywiste maksimum to kilka tysięcy partycji na serwer i kilkaset tysięcy na cały klaster.
+
+Producenci wysyłają wiadomość do konkretnej partycji w topicu. Offset jest przydzielany w brokerze i zawsze jest to kolejny numer. Nie można nadpisać wiadomości. Nie można też jej usunąć z pozycji konsumenta. Pisząc kodm nie musimy jednak sami ustalać partycji, na jaką ma trafić wiadomość. Kod producenta sam wybierze partycję na podstawie klucza wiadomości, a jeśli nie ma klucza, wyśle wiadomość do losowej partycji.
+
+Odczytywanie wiadomości
+
+Dane w topicu nie są usuwane po odczytaniu. Domyślnym zachowaniem jest automatyczne usuwanie wpisów starszych niż tydzień, możemy zmienić tę wartość w konfiguracji brokera lub topicu. Pozwala to konsumentom na wybranie samodzielnie, z jakiego miejsca chcą zacząć czytać. Pozwala to na czytanie tej samej partycji równocześnie, z różnych miejsc.
+
+Nauka Kafki
+
+Wasza ścieżka będzie zależeć od tego, w jakim języku programujecie i czy zdecydujecie się na platformę Kafki od Cloudera lub Confluent. Podstawy będą podobne. Poniżej przydatne linki:
+
+Na tej stronie można się zapisać na darmowy 1,5-godzinny kurs oraz wykonać test wiedzy. Są tu też płatne certyfikaty dla doświadczonych programistów lub administratorów Kafki.
+Dokumentacja Apache Kafka, która zawiera też wprowadzenie.
+Jeżeli nie chcecie uruchamiać własnej instancji Kafki, możecie stworzyć za darmo 5 topików we współdzielonym klastrze cloudkarafka. Max. 10 MB na topic.
+Przykładowe projektydla różnych zastosowań.
+Cała darmowa książka Kafka: The Definitive Guide (322 strony).
+Lista video i artykułów.
+Przykładowe projekty TODO
+https://github.com/dsu/kafka-streams-redis-lambda-poc
+
+https://github.com/dsu/kafka-docker-subscription
+
+Kiedy używać Kafki
+Jeżeli nie możesz użyć bazy danych czy innego rozwiązania do komunikacji asynchronicznej. Apache Kafka nie nadaje się zbyt dobrze do małych projektów. Na starcie wymaga kilku serwerów, aby odczuć korzyści  z jej używania, jednak w dużej organizacji jest to prostsze, niż próba zarządzania jedną wielką bazą danych lub wieloma różnymi.
+
+Może wydawać się to śmieszne, ale po prostu w wielu tabelach w bazach danych wykorzystywanych w dużych korporacjach zaczęło brakować wolnych kluczy i architekci zaczęli szukać sposobów jak zarządzać danymi tak, aby nie były potrzebne skomplikowane migracje i przepisywanie systemów. W Kafce dane są wyspecjalizowane, każdy zapisuje dane do niezależnego topicu. Dane z jednego lub wielu tematów można przetworzyć i przesłać dalej. Jest to też oszczędność miejsca – nie każdy zbiór danych potrzebuje tak samo wysokiego współczynnika replikacji.  Nie ma też problemu z zakleszczeniem czy liczbą połączeń do bazy.
+
+Jeżeli potrzebujesz maksymalnej możliwej przepustowości, alternatywy to Apache Spark, Storm, Flink, Redis, RabbitMQ. Żadna z alternatyw jednak nie ma takich samych właściwości jak Kafka i jest stworzona do nieco innych celów.
+
+Chyba największą wadą Kafki jest brak indeksowania. Nawet jeśli nasz projekt nie przewiduje analizy danych, wyszukiwania, łączenia to będzie nam to potrzebne w fazie testowania, debugowania oprogramowania. Nie możemy też odpytać Kafki o konkretne pole w wiadomości, zawsze musimy pobrać całą wiadomość, odkodować dane i dopiero dostajemy to, co potrzebne.
+
+Nie ma też opcji filtracji tego, jakie dane pobierzemy z Kafki, możemy posłużyć się tylko numerem partycji i offsetem. Weryfikacja nowej funkcjonalności w środowisku SIT/ UAT, gdzie możemy już np. chcieć mieć topiki o wielkości kilkudziesięciu GB, oznacza każdą próbę weryfikacji czy dana wiadomość trafiła do danego topicu i może to trwać godziny dla pojedynczego zapytania. Oczywiście utrudnia to pracę.
+
+Nie da się ukryć, że w przypadku podobnego zbioru danych w bazach relacyjnych nie byłoby tego problemu. Mamy przecież takie bazy jak AWS Aurora, która  też jest szybka i się skaluje. Mamy też bazy NoSQL DynamoDB,  Apache Cassandra , Redis, MongoDB 3.6 change streams, które mają indeksy, własny język zapytań.
+
+Jeżeli używasz już RabbitMQ lub innego klasycznego message brokera to nie ma wielu powodów, aby przechodzić na Kafkę. Kafka ma szeregowanie wiadomości w ramach partycji, ma persystencję wiadomości out of the box, której właściwie możemy nie potrzebować. Kafka nie ma odpowiednika dla Exchanges, priorytetów wiadomości.
+
+Ponadto implementacja metody subscribe  konsumenta nie jest asynchroniczna. Używa mechanizmu on-demand pooling do odczytywania danych.
+
+
+Narzędzia
+GIT + Jenkins
+Mowa o jakimkolwiek narzędziu  CVS i CI. W dużej organizacji ułatwiają zarządzanie schematami. Tworzymy jedno repozytorium ze schematami, gdzie każdy może stworzyć PR z własnym schematem stworzonym na potrzeby projektu. Po zmerge’owaniu zmian Jenkins sam uaktualni schemat w rejestrze schematów.
+
+Dzięki temu wystarczy udostępnić samo repozytorium, aby mieć możliwość podglądu istniejących schematów, dodanie nowego po weryfikacji, bez przyznawania każdemu użytkownikowi możliwości zarządzania schema registry.
+
+kafka-topics
+Podstawowym narzędziem jest  Kafka topics. Pozwala na proste listowanie danych w topiku, partycji, proste wyszukiwanie.
+
+źródło: https://bulldogjob.pl/readme/apache-kafka-opis-dzialania-i-zastosowania
